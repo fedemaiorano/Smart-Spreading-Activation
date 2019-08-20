@@ -1,0 +1,29 @@
+CREATE INDEX ON :Nods(id);
+USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM 'file:///edges.csv' AS csv
+MERGE (s:Nods {id:csv.source })
+MERGE (t:Nods {id:csv.target});
+
+USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM 'file:///edges.csv' AS csv
+MATCH (s:Nods {id:csv.source })
+MATCH (t:Nods {id:csv.target})
+MERGE (s)-[:Conn {weight:1}]-(t);
+
+MATCH (n) SET n.activation = null, n.fired=false;
+
+MATCH (n) WHERE n.id="1102" SET n.activation = 1;
+
+//Iteration
+MATCH (i)-[r]-(j) WHERE NOT i.fired AND i.activation IS NOT NULL AND i.activation>=0.1 AND NOT j.fired SET j.NewActivation =  COALESCE(j.activation, 0) + i.activation * COALESCE(r.weight,0) * 0.9
+SET i.toFire = TRUE;
+
+MATCH (n) WHERE n.toFire SET n.fired = TRUE SET n.toFire = null;
+
+MATCH (n) WHERE n.NewActivation IS NOT NULL SET n.activation = n.NewActivation SET n.NewActivation = null;
+
+MATCH (j:Nods) WHERE j.activation<=0 SET j.activation=null;
+
+MATCH (j:Nods) WHERE j.activation>1 SET j.activation = 1;
+
+//Repeat Iteration
